@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang='pt-BR'><head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1'>
+<title>Inventario Linda Rosa</title>
+<script src='https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/umd/zxing-browser.min.js' onerror="var s=document.createElement('script');s.src='https://unpkg.com/@zxing/browser@0.2.1/umd/zxing-browser.min.js';document.head.appendChild(s);"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.4 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;background:#111;color:#eee}
+header{position:sticky;top:0;background:#1b1b1b;padding:10px 12px;border-bottom:1px solid #333;z-index:10}
+.linha{display:flex;gap:8px;align-items:center}
+select,input,button,textarea{font:inherit;border-radius:8px;border:1px solid #444;background:#222;color:#eee;padding:10px}
+select,input,textarea{width:100%}
+button{background:#2d6cdf;border-color:#2d6cdf;color:#fff;white-space:nowrap;cursor:pointer}
+button:disabled{opacity:.5}
+.bm{padding:6px 10px;font-size:15px;background:#333;border:1px solid #555;border-radius:8px;color:#eee;cursor:pointer}
+.bp{padding:6px 12px;font-size:15px;background:#2d6cdf;border:1px solid #2d6cdf;border-radius:8px;color:#fff;cursor:pointer}
+.bx{padding:4px 10px;font-size:14px;background:#2a1717;border:1px solid #a33;border-radius:8px;color:#f88;cursor:pointer}
+#codigo{font-size:20px;letter-spacing:.5px}
+#qtd{width:82px;text-align:center;font-size:18px;font-weight:700}
+#btcam{background:#1f7a3d;border-color:#1f7a3d;padding:10px 14px;font-size:18px}
+#btcolqr{background:#8a6a12;border-color:#8a6a12;font-size:14px;padding:8px 10px}
+main{padding:12px;padding-bottom:90px}
+.item{background:#1b1b1b;border:1px solid #333;border-radius:10px;padding:10px;margin-bottom:8px}
+.item.alerta{border-color:#a33;background:#2a1717}
+.topo{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.cod{font-weight:700;font-size:17px}
+.nome{color:#aaa;font-size:13px;margin:2px 0 8px}
+.nums{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.qtd{display:flex;gap:6px;align-items:center}
+.qtd input{width:70px;text-align:center;font-size:19px;font-weight:700}
+.tag{font-size:12px;color:#999}
+.tag b{color:#ddd}
+.loc{font-size:12px;color:#dc6}
+.loc b{color:#fc6}
+.aviso{color:#f39;font-size:13px;margin-top:6px}
+#rodape{position:fixed;left:0;right:0;bottom:0;background:#1b1b1b;border-top:1px solid #333;padding:10px 12px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+#total{font-size:14px;color:#bbb}
+#msg{font-size:13px;min-height:18px;color:#8c8}
+#painel,#procura{display:none;background:#161616;border:1px solid #444;border-radius:10px;padding:12px;margin-bottom:12px}
+#painel h3,#procura h3{margin:0 0 8px;font-size:16px}
+.pl{border-bottom:1px solid #2a2a2a;padding:6px 0;font-size:14px}
+.ok{color:#5c5}
+.no{color:#f66}
+.sim{color:#dc6}
+.eq{color:#888}
+.obs{color:#999;font-size:12px}
+.pr{border-bottom:1px solid #2a2a2a;padding:8px 0}
+.pr .l1{font-weight:600;font-size:14px}
+.pr .l2{color:#999;font-size:12px;margin:2px 0 6px}
+.pr .l3{display:flex;gap:8px;align-items:center}
+.pr input{width:74px;text-align:center;font-size:17px;font-weight:700}
+#colbar{display:none;margin-bottom:8px}
+#colatual{font-weight:700;font-size:20px;color:#fc6;white-space:nowrap;min-width:74px}
+#colchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.ch{padding:4px 9px;font-size:13px;background:#2a2a2a;border:1px solid #555;border-radius:14px;color:#ddd;cursor:pointer}
+.ch.on{background:#4a3a10;border-color:#fc6;color:#fc6}
+#cam{position:fixed;inset:0;background:#000;z-index:50;display:none;flex-direction:column}
+#palco{position:relative;flex:1;overflow:hidden}
+#vid{width:100%;height:100%;object-fit:cover;background:#000}
+#mira{position:absolute;left:4%;right:4%;top:30%;height:40%;border:3px solid #2d6cdf;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.35)}
+#camtopo{position:absolute;top:0;left:0;right:0;padding:10px 12px;background:rgba(0,0,0,.55);display:flex;justify-content:space-between;align-items:center}
+#camcol{font-weight:700;font-size:18px;color:#fc6}
+#camtot{font-size:13px;color:#bbb}
+#cambaixo{padding:12px;background:#1b1b1b;border-top:1px solid #333}
+#camtitulo{display:block;font-size:13px;color:#bbb;margin-bottom:4px}
+#camtxt{display:block;font-size:15px;color:#8c8;min-height:22px;margin-bottom:10px}
+#btdiag,#btproba{background:none;border:none;color:#666;font-size:11px;padding:2px 8px 2px 0;text-decoration:underline;cursor:pointer;width:auto}
+</style></head><body>
+<header>
+<div class='linha' style='margin-bottom:8px'>
+<select id='deposito'>
+<option value='14888813825'>Linda Rosa Ecomerce</option>
+<option value='14889091227'>Mega Polo (loja fisica)</option>
+<option value='14887643353'>Geral</option>
+<option value='14888871763'>Ovelha</option>
+<option value='14889165652'>TikTok Studio Clara</option>
+</select>
+<button class='bm' id='btproc'>Procurar</button>
+</div>
+<div id='colbar'>
+<div class='linha'>
+<span class='tag'>Coluna</span>
+<span id='colatual'>--</span>
+<button class='bp' id='btcolqr'>Ler QR da coluna</button>
+</div>
+<div class='linha' style='margin-top:6px'>
+<select id='colsel'></select>
+</div>
+<div id='colchips'></div>
+</div>
+<div class='linha'>
+<input id='codigo' placeholder='bipe ou digite o codigo' autocomplete='off' autocapitalize='characters' spellcheck='false'>
+<input id='qtd' type='number' inputmode='numeric' placeholder='qtd'>
+<button class='bm' id='btadd'>Somar</button>
+</div>
+<div class='linha' style='margin-top:8px'>
+<button id='btcam' style='width:100%'>Bipar peca com a camera</button>
+</div>
+<div class='linha' style='margin-top:6px'>
+<button class='bm' id='btfotoger' style='width:100%'>Ler tirando foto (peca ou coluna)</button>
+</div>
+<div id='msg'></div>
+<input type='file' accept='image/*' capture='environment' id='fotoin' style='display:none'>
+<button id='btdiag'>diagnostico da camera</button>
+<button id='btproba'>testar a camera passo a passo</button>
+</header>
+<main><div id='procura'></div><div id='painel'></div><div id='lista'></div></main>
+<div id='rodape'>
+<div id='total'>carregando...</div>
+<div class='linha'>
+<button class='bm' id='btexport'>CSV</button>
+<button class='bp' id='btsync'>Conferir</button>
+</div>
+</div>
+<div id='cam'>
+<div id='palco'>
+<video id='vid' playsinline muted autoplay></video>
+<div id='mira'></div>
+<div id='camtopo'><span id='camcol'></span><span id='camtot'></span></div>
+</div>
+<div id='cambaixo'>
+<span id='camtitulo'></span>
+<span id='camtxt'></span>
+<div class='linha'>
+<button class='bx' id='btdesfaz' style='flex:1'>desfazer -1</button>
+<button class='bm' id='btfoto' style='flex:1'>tirar foto</button>
+<button class='bp' id='btcamx' style='flex:1'>fechar</button>
+</div>
+</div>
+</div>
+<script>
+(function(){
+var params = new URLSearchParams(location.search);
+var CHAVE = params.get('chave') || '';
+var BASE = 'https://hugomaia.app.n8n.cloud/webhook';
+var API = BASE + '/lr-inventario';
+var GRAVAR = BASE + '/lr-inventario-gravar';
+var SESSAO = params.get('sessao') || ('inv-' + new Date().toISOString().slice(0,10));
+var dep = params.get('deposito') || '14888813825';
+var COM_LOCAL = { '14888813825':1, '14889165652':1 };
+var MAPA_COL = [['A','D',13],['A','E',11],['B','D',1],['B','E',5],['C','D',11],['C','E',13]];
+var LOCAL = '';
+var itens = [];
+var achados = [];
+var scanning = false, modoColuna = false, zxReader = null, zxCtl = null, stream = null, laco = 0;
+var ultimoCod = '', ultimoT = 0;
+
+function el(id){ return document.getElementById(id); }
+function camMsg(t, erro){ var c = el('camtxt'); c.textContent = t || ''; c.style.color = erro ? '#f77' : '#8c8'; }
+function msg(t, erro){ var m = el('msg'); m.textContent = t || ''; m.style.color = erro ? '#f77' : '#8c8'; if (scanning) { camMsg(t, erro); } }
+function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function num(v){ return (v === null || v === undefined || v !== v) ? '?' : v; }
+function vibrar(){ try { if (navigator.vibrate) { navigator.vibrate(60); } } catch(e){} }
+function precisaLocal(){ return !!COM_LOCAL[dep]; }
+function porque(e){ if (!e) { return 'erro desconhecido'; } return (e.name ? e.name + ': ' : '') + (e.message || String(e)); }
+
+function post(url, dados){
+  var corpo = new URLSearchParams();
+  corpo.append('chave', CHAVE);
+  for (var k in dados) { if (dados[k] !== undefined && dados[k] !== null) { corpo.append(k, dados[k]); } }
+  return fetch(url, { method:'POST', body: corpo }).then(function(r){ return r.json(); });
+}
+
+// ---------- coluna ----------
+function todasColunas(){
+  var out = [];
+  for (var i = 0; i < MAPA_COL.length; i++) {
+    var rua = MAPA_COL[i][0], lado = MAPA_COL[i][1], n = MAPA_COL[i][2];
+    for (var k = 1; k <= n; k++) { out.push(rua + ('0' + k).slice(-2) + lado); }
+  }
+  out.sort();
+  return out;
+}
+function ehColuna(txt){
+  var s = String(txt || '').trim().toUpperCase().replace(/^(LR\.|LRCOL:|#)/, '');
+  return /^[A-Z]\d{2}[DE]$/.test(s) ? s : '';
+}
+function colunasUsadas(){
+  var vistas = {}, out = [];
+  for (var i = 0; i < itens.length; i++) {
+    var ls = itens[i].locais || [];
+    for (var j = 0; j < ls.length; j++) { if (!vistas[ls[j]]) { vistas[ls[j]] = 1; out.push(ls[j]); } }
+  }
+  out.sort();
+  return out;
+}
+function montarSelect(){
+  var cols = todasColunas();
+  var h = '<option value="">escolher a coluna na lista...</option>';
+  for (var i = 0; i < cols.length; i++) {
+    var c = cols[i];
+    h += '<option value="' + c + '">' + c + ' — rua ' + c.charAt(0) + ', lado ' + (c.charAt(3) === 'D' ? 'direito' : 'esquerdo') + ', coluna ' + c.substr(1,2) + '</option>';
+  }
+  el('colsel').innerHTML = h;
+}
+function desenharColunas(){
+  el('colbar').style.display = precisaLocal() ? 'block' : 'none';
+  el('colatual').textContent = LOCAL || '--';
+  el('colsel').value = LOCAL || '';
+  var cols = colunasUsadas();
+  var h = '';
+  for (var i = 0; i < cols.length; i++) {
+    h += '<button class="ch' + (cols[i] === LOCAL ? ' on' : '') + '" data-col="' + esc(cols[i]) + '">' + esc(cols[i]) + '</button>';
+  }
+  el('colchips').innerHTML = h;
+}
+function irParaColuna(v){
+  if (!v) { return; }
+  LOCAL = v;
+  el('camcol').textContent = LOCAL;
+  desenharColunas();
+  msg('coluna ' + LOCAL + ': pode contar');
+}
+function marcarLocal(it){
+  if (!precisaLocal() || !LOCAL) { return; }
+  if (!it.locais) { it.locais = []; }
+  if (it.locais.indexOf(LOCAL) < 0) { it.locais.push(LOCAL); it.locais.sort(); }
+}
+
+// ---------- lista ----------
+function desenhar(){
+  var l = el('lista'); l.innerHTML = '';
+  var pecas = 0, quantos = 0;
+  for (var i = itens.length - 1; i >= 0; i--) {
+    var it = itens[i];
+    if (it.deposito !== dep) { continue; }
+    pecas += it.contado; quantos++;
+    var alerta = (it.reserva > 0 && it.contado < it.reserva);
+    var d = document.createElement('div');
+    d.className = 'item' + (alerta ? ' alerta' : '');
+    var h = '<div class=topo><div><div class=cod>' + esc(it.codigo) + '</div><div class=nome>' + esc(it.nome) + '</div></div>';
+    h += '<button class=bx data-tira=' + i + '>excluir</button></div><div class=nums>';
+    h += '<div class=qtd><button class=bm data-menos=' + i + '>-</button>';
+    h += '<input type=number inputmode=numeric data-qtd=' + i + ' value=' + it.contado + '>';
+    h += '<button class=bp data-mais=' + i + '>+</button></div>';
+    h += '<span class=tag>Bling <b>' + num(it.fisico) + '</b></span>';
+    h += '<span class=tag>reserva <b>' + num(it.reserva) + '</b></span>';
+    h += '<span class=tag>dif <b>' + (it.contado - (it.fisico || 0)) + '</b></span>';
+    if (it.locais && it.locais.length) { h += '<span class=loc>local <b>' + esc(it.locais.join(',')) + '</b></span>'; }
+    h += '</div>';
+    if (alerta) { h += '<div class=aviso>contado abaixo da reserva: faltou contar ou a reserva esta orfa</div>'; }
+    d.innerHTML = h;
+    l.appendChild(d);
+  }
+  el('total').textContent = quantos + ' codigos, ' + pecas + ' pecas';
+  el('camtot').textContent = quantos + ' codigos, ' + pecas + ' pecas';
+}
+
+function gravarLinha(it){
+  post(API, { acao:'contar', sessao:SESSAO, deposito:it.deposito, codigo:it.codigo, idBling:it.idBling,
+    nome:it.nome, contado:it.contado, fisico_no_ato:it.fisico, reserva_no_ato:it.reserva,
+    local:(it.locais || []).join(',') })
+  .then(function(r){ if (r && r.ok) { msg('salvo ' + it.codigo + ': ' + it.contado + ((it.locais && it.locais.length) ? ' em ' + it.locais.join(',') : '')); } else { msg('NAO SALVOU ' + it.codigo, true); } })
+  .catch(function(){ msg('NAO SALVOU ' + it.codigo + ' no servidor', true); });
+}
+
+function removerLinha(i){
+  var it = itens[i];
+  if (!it) return;
+  post(API, { acao:'contar', status:'removido', sessao:SESSAO, deposito:it.deposito, codigo:it.codigo, idBling:it.idBling,
+    nome:it.nome, contado:0, fisico_no_ato:it.fisico, reserva_no_ato:it.reserva, local:(it.locais || []).join(','), observacao:'tirado da contagem pelo app' })
+  .then(function(){ msg('removido ' + it.codigo); })
+  .catch(function(){ msg('NAO CONSEGUI REMOVER ' + it.codigo + '; recarregue a pagina', true); });
+  itens.splice(i, 1);
+  desenhar(); desenharColunas();
+}
+
+function achar(cod){ for (var i=0;i<itens.length;i++){ if (itens[i].codigo===cod && itens[i].deposito===dep) return i; } return -1; }
+
+function somar(dados, quanto){
+  var i = achar(dados.codigo);
+  if (i >= 0) { itens[i].contado += quanto; marcarLocal(itens[i]); desenhar(); desenharColunas(); gravarLinha(itens[i]); return; }
+  var novo = { codigo:dados.codigo, nome:dados.nome, idBling:dados.idBling, deposito:dep, contado:quanto, fisico:dados.fisico, reserva:dados.reserva, locais:[] };
+  marcarLocal(novo);
+  itens.push(novo);
+  desenhar(); desenharColunas(); gravarLinha(novo);
+}
+
+function lerQtd(){ var v = parseInt(el('qtd').value, 10); return (isNaN(v) || v <= 0) ? 1 : v; }
+
+function bipar(cod, quanto){
+  cod = String(cod||'').trim().toUpperCase();
+  if (!cod) return;
+  var col = ehColuna(cod);
+  if (col) { irParaColuna(col); vibrar(); return; }
+  if (precisaLocal() && !LOCAL) { msg('escolha a coluna antes de contar (lista acima ou QR)', true); return; }
+  if (quanto === undefined) { quanto = lerQtd(); }
+  var i = achar(cod);
+  if (i >= 0) { itens[i].contado += quanto; marcarLocal(itens[i]); desenhar(); desenharColunas(); gravarLinha(itens[i]); el('qtd').value=''; vibrar(); msg('+' + quanto + ' em ' + cod + ' (total ' + itens[i].contado + ')'); return; }
+  msg('procurando ' + cod + ' no Bling...');
+  post(API, { acao:'buscar', codigo:cod, deposito:dep })
+   .then(function(res){
+     if (!res || !res.ok) { msg((res && res.erro) || 'nao achei esse codigo', true); return; }
+     somar(res, quanto); el('qtd').value=''; vibrar();
+     msg('achei: ' + res.nome + ' (+' + quanto + ')');
+   })
+   .catch(function(){ msg('sem resposta do servidor', true); });
+}
+
+function desfazer(){
+  if (!ultimoCod) { msg('nada para desfazer', true); return; }
+  var i = achar(ultimoCod);
+  if (i < 0) { msg('nada para desfazer', true); return; }
+  itens[i].contado = Math.max(0, itens[i].contado - 1);
+  desenhar(); gravarLinha(itens[i]);
+  msg('-1 em ' + ultimoCod + ' (total ' + itens[i].contado + ')');
+  ultimoCod = ''; ultimoT = 0;
+}
+
+// ---------- camera ----------
+var etapa = '';
+function camPasso(t){ etapa = t; camMsg(t); }
+
+function diagnostico(){
+  var d = [];
+  d.push('endereco: ' + location.protocol);
+  d.push('camera liberada: ' + ((navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ? 'sim' : 'NAO'));
+  d.push('leitor nativo: ' + (('BarcodeDetector' in window) ? 'sim' : 'nao'));
+  d.push('leitor ZXing: ' + (window.ZXingBrowser ? 'carregado' : 'NAO carregou'));
+  d.push('ultima etapa: ' + (etapa || '-'));
+  d.push('navegador: ' + String(navigator.userAgent).slice(0, 120));
+  return d.join('  //  ');
+}
+
+function mostrarErroCam(texto){
+  var p = el('painel');
+  p.style.display = 'block';
+  p.innerHTML = '<h3>Camera</h3>' +
+    '<div class=obs style="color:#f77;margin-bottom:10px;font-size:14px">' + esc(texto) + '</div>' +
+    '<div class=obs style="margin-bottom:8px">Alternativa que sempre funciona no iPhone: tire uma foto do codigo.</div>' +
+    '<div class=linha style="margin-bottom:12px"><button class=bp id=btfoto2>Tirar foto do codigo</button></div>' +
+    '<div class=obs style="margin-bottom:10px">Ou conte sem camera: escolha a coluna na lista do topo e digite o codigo da etiqueta no campo.</div>' +
+    '<div class=linha style="margin-bottom:12px"><button class=bm id=btproba2>Testar a camera passo a passo</button></div>' +
+    '<div class=obs style="word-break:break-all">' + esc(diagnostico()) + '</div>';
+  var b = el('btfoto2');
+  if (b) { b.addEventListener('click', function(){ el('fotoin').click(); }); }
+  var b2 = el('btproba2');
+  if (b2) { b2.addEventListener('click', probaCamera); }
+  window.scrollTo(0,0);
+}
+
+function falharCam(texto){
+  scanning = false;
+  pararStream();
+  el('cam').style.display = 'none';
+  msg(texto, true);
+  mostrarErroCam(texto);
+}
+
+function aceitar(txt){
+  txt = String(txt || '').trim();
+  if (!txt) return;
+  var col = ehColuna(txt);
+  if (modoColuna) {
+    if (!col) { msg('isso nao e etiqueta de coluna. Aponte para o QR da coluna.', true); return; }
+    irParaColuna(col); vibrar(); fecharCam();
+    return;
+  }
+  var agora = Date.now();
+  if (txt === ultimoCod && (agora - ultimoT) < 1500) { return; }
+  ultimoCod = txt; ultimoT = agora;
+  vibrar();
+  bipar(txt, 1);
+}
+
+function novoLeitor(){
+  try { return new window.ZXingBrowser.BrowserMultiFormatReader(); } catch(e){ return null; }
+}
+
+function pedirCamera(c){
+  try {
+    var p = navigator.mediaDevices.getUserMedia(c);
+    return (p && p.then) ? p : Promise.reject(new Error('o navegador nao devolveu a camera'));
+  } catch(e) { return Promise.reject(e); }
+}
+
+function esperarVideo(v){
+  return new Promise(function(ok, falha){
+    var t0 = Date.now();
+    (function ver(){
+      if (!scanning) { ok(); return; }
+      if (v.videoWidth > 0 && v.videoHeight > 0) { ok(); return; }
+      if (Date.now() - t0 > 8000) { falha(new Error('o video nao comecou (tela preta)')); return; }
+      setTimeout(ver, 120);
+    })();
+  });
+}
+
+function lacoLeitura(){
+  var v = el('vid');
+  var cv = document.createElement('canvas');
+  var ctx = null;
+  try { ctx = cv.getContext('2d'); } catch(e) { ctx = null; }
+  var leitor = novoLeitor();
+  if (!ctx || !leitor) { falharCam('nao consegui preparar o leitor neste navegador.'); return; }
+  function passo(){
+    if (!scanning) { return; }
+    try {
+      var w = v.videoWidth, h = v.videoHeight;
+      if (w && h) {
+        var x = Math.round(w * 0.04), y = Math.round(h * 0.30);
+        var lw = Math.round(w * 0.92), lh = Math.round(h * 0.40);
+        var k = Math.min(1, 700 / lw);
+        cv.width = Math.max(1, Math.round(lw * k));
+        cv.height = Math.max(1, Math.round(lh * k));
+        ctx.drawImage(v, x, y, lw, lh, 0, 0, cv.width, cv.height);
+        try {
+          var res = leitor.decodeFromCanvas(cv);
+          if (res) { aceitar(res.getText ? res.getText() : res.text); }
+        } catch(e2) { /* nao achou nada neste quadro: normal */ }
+      }
+    } catch(e) { /* quadro ruim: tenta o proximo */ }
+    laco = setTimeout(passo, 220);
+  }
+  passo();
+}
+
+var TENTATIVAS = [
+  ['camera de tras', { video: { facingMode: { ideal: 'environment' } }, audio: false }],
+  ['camera de tras (simples)', { video: { facingMode: 'environment' } }],
+  ['camera padrao', { video: true, audio: false }],
+  ['camera minima', { video: {} }]
+];
+
+function tentarCameras(i){
+  if (i >= TENTATIVAS.length) { return Promise.reject(new Error('nenhum modo de camera funcionou neste aparelho')); }
+  camPasso('1 de 3: tentando ' + TENTATIVAS[i][0] + '...');
+  return pedirCamera(TENTATIVAS[i][1]).catch(function(e){
+    if (i === TENTATIVAS.length - 1) { throw e; }
+    return tentarCameras(i + 1);
+  });
+}
+
+function probaCamera(){
+  var p = el('painel');
+  p.style.display = 'block';
+  p.innerHTML = '<h3>Teste da camera</h3><div class=obs id=probatxt style="line-height:1.6;word-break:break-all">testando...</div>';
+  var linhas = [];
+  function add(t){ linhas.push(t); var e = el('probatxt'); if (e) { e.innerHTML = linhas.map(esc).join('<br>'); } }
+  linhas = [];
+  add('endereco seguro: ' + (window.isSecureContext ? 'sim' : 'NAO'));
+  add('pagina no topo: ' + ((window.top === window.self) ? 'sim' : 'NAO, esta dentro de uma moldura'));
+  var md = navigator.mediaDevices;
+  add('mediaDevices: ' + (md ? 'existe' : 'NAO existe'));
+  if (md) {
+    add('getUserMedia: ' + (typeof md.getUserMedia));
+    var src = '';
+    try { src = String(md.getUserMedia).replace(/\s+/g, ' ').slice(0, 70); } catch(e) { src = 'nao consegui ler'; }
+    add('funcao: ' + src);
+  }
+  add('webkitGetUserMedia antigo: ' + (typeof navigator.webkitGetUserMedia));
+  var i = 0;
+  function proxima(){
+    if (i >= TENTATIVAS.length) { add('--- fim do teste ---'); return; }
+    var nome = TENTATIVAS[i][0], c = TENTATIVAS[i][1];
+    i++;
+    var pr = null;
+    try { pr = navigator.mediaDevices.getUserMedia(c); }
+    catch(e) { add(nome + ': FALHOU na hora -- ' + porque(e)); proxima(); return; }
+    if (!pr || !pr.then) { add(nome + ': nao devolveu promessa'); proxima(); return; }
+    pr.then(function(st){
+      var n = 0;
+      try { n = st.getVideoTracks().length; } catch(e) {}
+      add(nome + ': FUNCIONOU (' + n + ' camera)');
+      try { var t = st.getTracks(); for (var k=0;k<t.length;k++){ t[k].stop(); } } catch(e) {}
+      proxima();
+    }).catch(function(e){ add(nome + ': ' + porque(e)); proxima(); });
+  }
+  if (md && md.enumerateDevices) {
+    md.enumerateDevices()
+     .then(function(ds){
+       var v = 0;
+       for (var k = 0; k < ds.length; k++) { if (ds[k].kind === 'videoinput') { v++; } }
+       add('cameras vistas: ' + v + ' (de ' + ds.length + ' dispositivos)');
+     })
+     .catch(function(e){ add('enumerateDevices: ' + porque(e)); })
+     .then(proxima, proxima);
+  } else {
+    proxima();
+  }
+}
+
+function abrirCam(soColuna){
+  modoColuna = !!soColuna;
+  if (!modoColuna && precisaLocal() && !LOCAL) { msg('escolha a coluna antes de contar (lista acima ou QR)', true); return; }
+  if (!window.ZXingBrowser || typeof window.ZXingBrowser.BrowserMultiFormatReader !== 'function') {
+    falharCam('o leitor de codigo nao carregou. Confira a internet e recarregue a pagina.');
+    return;
+  }
+  el('cam').style.display = 'flex';
+  el('camcol').textContent = LOCAL || '';
+  el('camtitulo').textContent = modoColuna ? 'LENDO A ETIQUETA DA COLUNA' : 'CONTANDO PECAS';
+  el('btdesfaz').style.display = modoColuna ? 'none' : '';
+  scanning = true;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    falharCam('este navegador nao libera a camera ao vivo. Use o botao de tirar foto.');
+    return;
+  }
+  var v = el('vid');
+  try {
+    v.setAttribute('playsinline', 'true');
+    v.setAttribute('webkit-playsinline', 'true');
+    v.setAttribute('muted', 'true');
+    v.muted = true;
+  } catch(e) {}
+  camPasso('1 de 3: pedindo acesso a camera...');
+  tentarCameras(0)
+   .then(function(s){
+     if (!s) { throw new Error('a camera nao respondeu'); }
+     if (!scanning) { try { var t = s.getTracks(); for (var i=0;i<t.length;i++){ t[i].stop(); } } catch(e){} return null; }
+     stream = s;
+     camPasso('2 de 3: ligando o video...');
+     try { v.srcObject = s; } catch(e) { throw new Error('nao consegui ligar o video: ' + porque(e)); }
+     var p = null;
+     try { p = v.play(); } catch(e) { p = null; }
+     return (p && p.then) ? p.catch(function(){ return null; }) : null;
+   })
+   .then(function(){ if (!scanning) { return null; } camPasso('3 de 3: preparando a leitura...'); return esperarVideo(v); })
+   .then(function(){
+     if (!scanning) { return; }
+     camPasso(modoColuna ? 'aponte para o QR da coluna' : 'aponte para o codigo de barras da peca');
+     lacoLeitura();
+   })
+   .catch(function(e){ falharCam('parou em "' + etapa + '" -- ' + porque(e)); });
+}
+
+function lerFoto(arq){
+  if (!arq) { return; }
+  var leitor = novoLeitor();
+  if (!leitor) { msg('o leitor nao carregou; recarregue a pagina', true); return; }
+  var url = URL.createObjectURL(arq);
+  msg('lendo a foto...');
+  leitor.decodeFromImageUrl(url)
+   .then(function(res){
+     try { URL.revokeObjectURL(url); } catch(e){}
+     ultimoCod = ''; ultimoT = 0;
+     aceitar(res.getText ? res.getText() : res.text);
+   })
+   .catch(function(){
+     try { URL.revokeObjectURL(url); } catch(e){}
+     msg('nao achei codigo nessa foto. Chegue mais perto, enquadre so o codigo e tente de novo.', true);
+   });
+}
+
+function pararStream(){
+  try { if (stream) { var t = stream.getTracks(); for (var i=0;i<t.length;i++){ t[i].stop(); } stream = null; } } catch(e){}
+  try { el('vid').srcObject = null; } catch(e){}
+}
+
+function fecharCam(){
+  scanning = false;
+  modoColuna = false;
+  if (laco) { clearTimeout(laco); laco = 0; }
+  pararStream();
+  el('cam').style.display = 'none';
+}
+
+// ---------- sessao ----------
+function restaurar(){
+  post(API, { acao:'resumo', sessao:SESSAO })
+   .then(function(res){
+     if (res && res.ok && res.linhas) {
+       itens = res.linhas.map(function(l){
+         var ls = String(l.local || '').split(',');
+         var lim = [];
+         for (var i=0;i<ls.length;i++){ var x = String(ls[i]).trim(); if (x) { lim.push(x); } }
+         return { codigo:l.codigo, nome:l.nome, idBling:l.idBling, deposito:String(l.deposito), contado:Number(l.contado), fisico:Number(l.fisico_no_ato), reserva:Number(l.reserva_no_ato), locais:lim };
+       });
+       desenhar(); desenharColunas();
+       msg('sessao ' + SESSAO + ' carregada');
+     } else { desenhar(); desenharColunas(); msg((res && res.erro) || ('sessao ' + SESSAO), !(res && res.ok)); }
+   })
+   .catch(function(){ desenhar(); desenharColunas(); msg('nao consegui carregar a sessao do servidor', true); });
+}
+
+function abrirProcura(){
+  var p = el('procura');
+  if (p.style.display === 'block') { p.style.display='none'; return; }
+  p.style.display = 'block';
+  p.innerHTML = '<h3>Procurar produto</h3><div class=obs style=margin-bottom:8px>o Bling filtra pelo COMECO do nome. Digite SAIA REBECA, nao apenas REBECA.</div><div class=linha><input id=ptexto placeholder=nome_do_produto autocapitalize=characters><button class=bp id=btpgo>Buscar</button></div><div id=presult></div>';
+  el('btpgo').addEventListener('click', procurar);
+  el('ptexto').addEventListener('keydown', function(e){ if (e.key==='Enter'){ e.preventDefault(); procurar(); } });
+  el('ptexto').focus();
+}
+
+function procurar(){
+  var t = el('ptexto').value.trim();
+  if (!t) return;
+  var r = el('presult');
+  r.innerHTML = '<div class=obs>procurando...</div>';
+  post(API, { acao:'procurar', texto:t, deposito:dep })
+   .then(function(res){
+     if (!res || !res.ok) { r.innerHTML = '<div class=obs style=color:#f77>' + esc((res && res.erro) || 'nao consegui procurar') + '</div>'; return; }
+     achados = res.linhas || [];
+     if (!achados.length) { r.innerHTML = '<div class=obs>' + esc(res.aviso || 'nada encontrado') + '</div>'; return; }
+     var h = '<div class=obs>' + achados.length + ' de ' + res.total + ' variacoes' + (res.bateu_o_teto ? ' (teto de 100 atingido, refine o nome)' : '') + '</div>';
+     for (var i=0;i<achados.length;i++){
+       var a = achados[i];
+       h += '<div class=pr><div class=l1>' + esc(a.codigo) + '</div><div class=l2>' + esc(a.nome) + '</div>';
+       h += '<div class=l3><span class=tag>Bling <b>' + num(a.fisico) + '</b></span><span class=tag>reserva <b>' + num(a.reserva) + '</b></span>';
+       h += '<input type=number inputmode=numeric placeholder=qtd data-pq=' + i + '>';
+       h += '<button class=bp data-padd=' + i + '>Somar</button></div></div>';
+     }
+     r.innerHTML = h;
+   })
+   .catch(function(){ r.innerHTML = '<div class=obs style=color:#f77>sem resposta do servidor</div>'; });
+}
+
+function classeStatus(st){
+  if (st === 'gravado') return 'ok';
+  if (st === 'recusado' || st === 'gravado sem conferir') return 'no';
+  if (st === 'simulado') return 'sim';
+  return 'eq';
+}
+
+function mostrarPainel(res, eraSimulacao, faltam){
+  var p = el('painel');
+  p.style.display = 'block';
+  var h = '<h3>' + (eraSimulacao ? 'Conferencia (nada foi gravado)' : 'Resultado da gravacao') + '</h3>';
+  var st = res.por_status || {};
+  var partes = [];
+  for (var k in st) { partes.push(st[k] + ' ' + k); }
+  h += '<div class=obs style=margin-bottom:8px>' + esc(partes.join(' - ')) + '</div>';
+  for (var i=0;i<res.linhas.length;i++){
+    var l = res.linhas[i];
+    h += '<div class=pl><span class=' + classeStatus(l.status) + '>' + esc(String(l.status).toUpperCase()) + '</span> ' + esc(l.codigo) + ' - contado ' + l.contado;
+    if (l.local) { h += ' <span class=loc>' + esc(l.local) + '</span>'; }
+    if (l.observacao) { h += '<div class=obs>' + esc(l.observacao) + '</div>'; }
+    h += '</div>';
+  }
+  if (eraSimulacao) {
+    h += '<div style=margin-top:12px><div class=obs style=margin-bottom:6px>para gravar de verdade, digite o PIN</div><div class=linha><input id=pin type=password inputmode=numeric placeholder=PIN autocomplete=off><button class=bp id=btgravar>Gravar no Bling</button></div></div>';
+  } else if (faltam > 0) {
+    h += '<div style=margin-top:12px><div class=linha><input id=pin type=password inputmode=numeric placeholder=PIN autocomplete=off><button class=bp id=btmais>Continuar: faltam ' + faltam + '</button></div></div>';
+  }
+  p.innerHTML = h;
+  var bg = el('btgravar');
+  if (bg) { bg.addEventListener('click', function(){ rodar(false, el('pin').value); }); }
+  var bmx = el('btmais');
+  if (bmx) { bmx.addEventListener('click', function(){ rodar(false, el('pin').value); }); }
+  window.scrollTo(0,0);
+}
+
+function puxarResumo(eraSimulacao, faltam){
+  post(API, { acao:'resumo', sessao:SESSAO })
+   .then(function(res){ el('btsync').disabled = false; if (res && res.ok) { mostrarPainel(res, eraSimulacao, faltam); msg(''); } else { msg('nao consegui ler o resumo', true); } })
+   .catch(function(){ el('btsync').disabled = false; msg('nao consegui ler o resumo', true); });
+}
+
+function rodar(simular, pin){
+  var b = el('btsync'); b.disabled = true;
+  msg(simular ? 'conferindo...' : 'gravando no Bling, nao feche a tela...');
+  post(GRAVAR, { sessao:SESSAO, simular: simular ? 'true' : 'false', pin: pin || '' })
+   .then(function(res){
+     if (!res || !res.ok) { msg('nao consegui iniciar', true); b.disabled=false; return; }
+     if (!res.iniciado) { msg(res.motivo || 'nada a fazer', true); b.disabled=false; return; }
+     var espera = 3000 + res.neste_lote * (simular ? 1200 : 3000);
+     msg((simular ? 'conferindo ' : 'gravando ') + res.neste_lote + ' codigo(s), aguarde...');
+     setTimeout(function(){ puxarResumo(simular, res.faltam_depois); }, espera);
+   })
+   .catch(function(){ msg('sem resposta do servidor', true); b.disabled=false; });
+}
+
+el('codigo').addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); bipar(this.value); this.value=''; this.focus(); } });
+el('qtd').addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); var c=el('codigo'); bipar(c.value); c.value=''; c.focus(); } });
+el('btadd').addEventListener('click', function(){ var c = el('codigo'); bipar(c.value); c.value=''; c.focus(); });
+el('btproc').addEventListener('click', abrirProcura);
+el('btsync').addEventListener('click', function(){ rodar(true, ''); });
+el('btcam').addEventListener('click', function(){ abrirCam(false); });
+el('btcolqr').addEventListener('click', function(){ abrirCam(true); });
+el('btcamx').addEventListener('click', fecharCam);
+el('btdesfaz').addEventListener('click', desfazer);
+el('btdiag').addEventListener('click', function(){ mostrarErroCam('Diagnostico da camera neste aparelho:'); });
+el('btfoto').addEventListener('click', function(){ el('fotoin').click(); });
+el('btfotoger').addEventListener('click', function(){ modoColuna = false; el('fotoin').click(); });
+el('btproba').addEventListener('click', probaCamera);
+el('fotoin').addEventListener('change', function(){ var f = this.files && this.files[0]; this.value = ''; lerFoto(f); });
+el('colsel').addEventListener('change', function(){ irParaColuna(this.value); });
+el('colchips').addEventListener('click', function(e){ if (e.target && e.target.dataset && e.target.dataset.col) { irParaColuna(e.target.dataset.col); } });
+el('deposito').value = dep;
+el('deposito').addEventListener('change', function(){ dep = this.value; if (!precisaLocal()) { LOCAL = ''; } desenhar(); desenharColunas(); msg('mostrando so o deposito escolhido'); });
+
+el('lista').addEventListener('click', function(e){
+  var t = e.target;
+  if (!t.dataset) return;
+  if (t.dataset.tira !== undefined) {
+    if (t.dataset.confirma === '1') { removerLinha(+t.dataset.tira); }
+    else { t.dataset.confirma = '1'; t.textContent = 'confirmar?'; }
+    return;
+  }
+  if (t.dataset.mais !== undefined) { var a=+t.dataset.mais; itens[a].contado+=1; marcarLocal(itens[a]); desenhar(); desenharColunas(); gravarLinha(itens[a]); }
+  if (t.dataset.menos !== undefined) { var b=+t.dataset.menos; itens[b].contado=Math.max(0,itens[b].contado-1); desenhar(); gravarLinha(itens[b]); }
+});
+el('lista').addEventListener('change', function(e){
+  var t = e.target;
+  if (t.dataset && t.dataset.qtd !== undefined) { var i=+t.dataset.qtd; itens[i].contado=Math.max(0, parseInt(t.value,10)||0); desenhar(); gravarLinha(itens[i]); }
+});
+el('procura').addEventListener('click', function(e){
+  var t = e.target;
+  if (t.dataset && t.dataset.padd !== undefined) {
+    var i = +t.dataset.padd;
+    var campo = el('procura').querySelector('[data-pq=\u0022' + i + '\u0022]');
+    var q = parseInt(campo && campo.value, 10);
+    if (isNaN(q) || q <= 0) { q = 1; }
+    var a = achados[i];
+    if (a.fisico === null) { msg('nao li o saldo dessa variacao, nao vou contar as cegas', true); return; }
+    if (precisaLocal() && !LOCAL) { msg('escolha a coluna antes de contar (lista acima ou QR)', true); return; }
+    somar(a, q);
+    if (campo) { campo.value = ''; }
+    msg('somei ' + q + ' em ' + a.codigo);
+  }
+});
+
+el('btexport').addEventListener('click', function(){
+  var linhas = ['codigo;nome;deposito;local;contado;bling;reserva'];
+  for (var i=0;i<itens.length;i++){ var it=itens[i]; linhas.push([it.codigo,String(it.nome||'').replace(/;/g,','),it.deposito,(it.locais||[]).join(' '),it.contado,it.fisico,it.reserva].join(';')); }
+  var p = el('painel');
+  p.style.display='block';
+  p.innerHTML = '<h3>CSV da sessao ' + esc(SESSAO) + '</h3><div class=obs style=margin-bottom:6px>selecione tudo e copie</div><textarea rows=12>' + esc(linhas.join('\n')) + '</textarea>';
+  window.scrollTo(0,0);
+});
+
+montarSelect();
+desenharColunas();
+if (!CHAVE) {
+  msg('abra pelo link completo, com a chave no fim do endereco', true);
+} else {
+  restaurar();
+}
+el('codigo').focus();
+})();
+</script></body></html>
