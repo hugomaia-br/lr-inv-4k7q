@@ -68,6 +68,7 @@ main{padding:12px;padding-bottom:90px}
 #cfcod{font-size:23px;font-weight:700;letter-spacing:.5px;color:#fff}
 #cfnome{font-size:14px;color:#bbb;margin:2px 0 8px}
 #cfsaldo{margin-bottom:10px}
+#cfaviso{display:none;background:#3a2a10;border:1px solid #c9a227;border-radius:8px;padding:8px;margin-bottom:10px;font-size:13px;color:#f5d76e}
 #cfqtd{width:96px;text-align:center;font-size:26px;font-weight:700}
 #cfmenos,#cfmais{font-size:24px;padding:10px 20px}
 #cfadd{font-size:19px;padding:15px}
@@ -116,6 +117,7 @@ main{padding:12px;padding-bottom:90px}
 <div id='cfcod'></div>
 <div id='cfnome'></div>
 <div id='cfsaldo'></div>
+<div id='cfaviso'></div>
 <div class='linha'>
 <button class='bm' id='cfmenos'>-</button>
 <input id='cfqtd' type='number' inputmode='numeric' value='1'>
@@ -272,7 +274,7 @@ function desenhar(){
 function gravarLinha(it){
   post(API, { acao:'contar', sessao:SESSAO, deposito:it.deposito, codigo:it.codigo, idBling:it.idBling,
     nome:it.nome, contado:it.contado, fisico_no_ato:it.fisico, reserva_no_ato:it.reserva,
-    local:(it.locais || []).join(',') })
+    local:(it.locais || []).join(','), origem:(it.origem || 'bipagem'), observacao:(it.nota || '') })
   .then(function(r){ if (r && r.ok) { msg('salvo ' + it.codigo + ': ' + it.contado + ((it.locais && it.locais.length) ? ' em ' + it.locais.join(',') : '')); } else { msg('NAO SALVOU ' + it.codigo, true); } })
   .catch(function(){ msg('NAO SALVOU ' + it.codigo + ' no servidor', true); });
 }
@@ -290,10 +292,15 @@ function removerLinha(i){
 
 function achar(cod){ for (var i=0;i<itens.length;i++){ if (itens[i].codigo===cod && itens[i].deposito===dep) return i; } return -1; }
 
-function somar(dados, quanto){
+function somar(dados, quanto, origem, nota){
+  origem = origem || 'bipagem';
   var i = achar(dados.codigo);
-  if (i >= 0) { itens[i].contado += quanto; marcarLocal(itens[i]); desenhar(); desenharColunas(); gravarLinha(itens[i]); return; }
-  var novo = { codigo:dados.codigo, nome:dados.nome, idBling:dados.idBling, deposito:dep, contado:quanto, fisico:dados.fisico, reserva:dados.reserva, locais:[] };
+  if (i >= 0) {
+    itens[i].contado += quanto;
+    if (origem !== 'bipagem' && itens[i].origem === 'bipagem') { itens[i].origem = origem; itens[i].nota = nota || itens[i].nota; }
+    marcarLocal(itens[i]); desenhar(); desenharColunas(); gravarLinha(itens[i]); return;
+  }
+  var novo = { codigo:dados.codigo, nome:dados.nome, idBling:dados.idBling, deposito:dep, contado:quanto, fisico:dados.fisico, reserva:dados.reserva, locais:[], origem:origem, nota:(nota || '') };
   marcarLocal(novo);
   itens.push(novo);
   desenhar(); desenharColunas(); gravarLinha(novo);
@@ -313,8 +320,16 @@ function bipar(cod, quanto){
   msg('procurando ' + cod + ' no Bling...');
   post(API, { acao:'buscar', codigo:cod, deposito:dep })
    .then(function(res){
-     if (!res || !res.ok) { msg((res && res.erro) || 'nao achei esse codigo', true); return; }
-     somar(res, quanto); el('qtd').value=''; vibrar();
+     if (!res || !res.ok) {
+       registrarFalha(cod, 'digitado');
+       somErro();
+       procurarSemelhante(cod, 0, function(alvo){
+         if (alvo) { alvo.via = 'digitado'; pausado = true; mostrarConfirma(alvo); }
+         else { msg('nao achei esse codigo nem nada parecido. Use o botao Procurar.', true); }
+       });
+       return;
+     }
+     somar(res, quanto, 'digitado'); el('qtd').value=''; vibrar();
      msg('achei: ' + res.nome + ' (+' + quanto + ')');
    })
    .catch(function(){ msg('sem resposta do servidor', true); });
@@ -328,6 +343,59 @@ function desfazer(){
   desenhar(); gravarLinha(itens[i]);
   msg('-1 em ' + ultimoCod + ' (total ' + itens[i].contado + ')');
   ultimoCod = ''; ultimoT = 0;
+}
+
+// ---------- origem da contagem e codigos que falharam ----------
+var ultimaFalhaEm = 0, ultimaFalhaCod = '';
+
+function registrarFalha(bruto, origem){
+  ultimaFalhaEm = Date.now();
+  ultimaFalhaCod = bruto;
+  post(API, { acao:'contar', status:'falha', sessao:SESSAO, deposito:dep, codigo:bruto,
+    nome:'(codigo nao encontrado no Bling)', contado:0, fisico_no_ato:0, reserva_no_ato:0,
+    local:LOCAL, origem:(origem || 'bipagem'),
+    observacao:'a etiqueta diz ' + bruto + ' e esse codigo nao existe no Bling' })
+  .catch(function(){});
+}
+
+// so mexe no pedaco depois do ultimo hifen (o codigo de cor), onde o erro acontece
+function variantes(cod){
+  var i = String(cod).lastIndexOf('-');
+  if (i < 0) { return []; }
+  var raiz = cod.slice(0, i + 1);
+  var cor = cod.slice(i + 1).toUpperCase();
+  var troca = { '0':'O', 'O':'0', '1':'I', 'I':'1', 'L':'1', '5':'S', 'S':'5', '8':'B', 'B':'8' };
+  var saida = [];
+  for (var k = 0; k < cor.length; k++) {
+    var c = cor.charAt(k);
+    var alt = troca[c];
+    if (!alt) { continue; }
+    saida.push(raiz + cor.slice(0, k) + alt + cor.slice(k + 1));
+    if (c === '1') { saida.push(raiz + cor.slice(0, k) + 'L' + cor.slice(k + 1)); }
+  }
+  var vistos = {}, limpo = [];
+  for (var j = 0; j < saida.length && limpo.length < 8; j++) {
+    var v = saida[j];
+    if (v !== cod && !vistos[v]) { vistos[v] = 1; limpo.push(v); }
+  }
+  return limpo;
+}
+
+function procurarSemelhante(bruto, indice, pronto){
+  var lista = (indice === 0) ? variantes(bruto.toUpperCase()) : window.__vars;
+  if (indice === 0) { window.__vars = lista; }
+  if (!lista.length || indice >= lista.length) { pronto(null); return; }
+  msg('procurando codigo parecido (' + (indice + 1) + ' de ' + lista.length + ')...');
+  post(API, { acao:'buscar', codigo:lista[indice], deposito:dep })
+   .then(function(res){
+     if (res && res.ok) { res.semelhante = true; res.lido = bruto; pronto(res); return; }
+     procurarSemelhante(bruto, indice + 1, pronto);
+   })
+   .catch(function(){ pronto(null); });
+}
+
+function origemDoProcurar(){
+  return (Date.now() - ultimaFalhaEm < 180000) ? 'procurar_apos_falha' : 'procurar_direto';
 }
 
 // ---------- som ----------
@@ -367,6 +435,10 @@ function mostrarConfirma(dados){
     '<span class=tag>reserva <b>' + num(dados.reserva) + '</b></span>' +
     (LOCAL ? ' &nbsp; <span class=loc>coluna <b>' + esc(LOCAL) + '</b></span>' : '') +
     (ja ? ' &nbsp; <span class=loc>ja contei <b>' + ja + '</b></span>' : '');
+  el('cfaviso').style.display = dados.semelhante ? 'block' : 'none';
+  if (dados.semelhante) {
+    el('cfaviso').innerHTML = 'ATENCAO: a etiqueta diz <b>' + esc(dados.lido) + '</b> e o cadastro tem <b>' + esc(dados.codigo) + '</b>. Confira o nome da peca antes de adicionar.';
+  }
   el('cfqtd').value = '1';
   el('confirma').style.display = 'block';
 }
@@ -384,7 +456,9 @@ function confirmarAdicao(){
   var q = parseInt(el('cfqtd').value, 10);
   if (isNaN(q) || q <= 0) { q = 1; }
   var cod = pendente.codigo;
-  somar(pendente, q);
+  var org = (pendente.via || 'bipagem') + (pendente.semelhante ? '_semelhante' : '');
+  var nota = pendente.semelhante ? ('etiqueta lida: ' + pendente.lido + ' / cadastro: ' + pendente.codigo) : '';
+  somar(pendente, q, org, nota);
   somAdicionou(); vibrar();
   fecharConfirma();
   ultimoCod = cod; ultimoT = Date.now();
@@ -400,7 +474,15 @@ function prepararConfirmacao(cod){
   msg('procurando ' + cod + ' no Bling...');
   post(API, { acao:'buscar', codigo:cod, deposito:dep })
    .then(function(res){
-     if (!res || !res.ok) { somErro(); msg((res && res.erro) || 'nao achei esse codigo', true); setTimeout(fecharConfirma, 1800); return; }
+     if (!res || !res.ok) {
+       somErro();
+       registrarFalha(cod, 'bipagem');
+       procurarSemelhante(cod, 0, function(alvo){
+         if (alvo) { alvo.via = 'bipagem'; mostrarConfirma(alvo); }
+         else { msg('etiqueta ' + cod + ' nao existe no Bling e nao achei nada parecido. Use o botao Procurar.', true); setTimeout(fecharConfirma, 2600); }
+       });
+       return;
+     }
      mostrarConfirma(res);
    })
    .catch(function(){ somErro(); msg('sem resposta do servidor', true); setTimeout(fecharConfirma, 1800); });
@@ -465,8 +547,39 @@ function aceitar(txt){
   prepararConfirmacao(txt);
 }
 
+function autoTesteOk(r){
+  try {
+    var w = new window.ZXingBrowser.BrowserQRCodeSvgWriter();
+    var svg = w.write('LR.TESTE', 240, 240);
+    var rects = svg.getElementsByTagName('rect');
+    if (!rects.length) { return false; }
+    var cv = document.createElement('canvas'); cv.width = 240; cv.height = 240;
+    var c = cv.getContext('2d');
+    c.fillStyle = '#fff'; c.fillRect(0, 0, 240, 240);
+    c.fillStyle = '#000';
+    for (var i = 0; i < rects.length; i++) {
+      var e = rects[i];
+      c.fillRect(+e.getAttribute('x'), +e.getAttribute('y'), +e.getAttribute('width'), +e.getAttribute('height'));
+    }
+    var t = r.decodeFromCanvas(cv);
+    var txt = t ? (t.getText ? t.getText() : t.text) : '';
+    return txt === 'LR.TESTE';
+  } catch(e) { return false; }
+}
+
 function novoLeitor(){
-  try { return new window.ZXingBrowser.BrowserMultiFormatReader(); } catch(e){ return null; }
+  var Z = window.ZXingBrowser;
+  if (!Z || typeof Z.BrowserMultiFormatReader !== 'function') { return null; }
+  try {
+    var r = new Z.BrowserMultiFormatReader();
+    if (Z.BarcodeFormat) {
+      try {
+        r.possibleFormats = [Z.BarcodeFormat.CODE_128, Z.BarcodeFormat.QR_CODE];
+        if (!autoTesteOk(r)) { r = new Z.BrowserMultiFormatReader(); }
+      } catch(e) { r = new Z.BrowserMultiFormatReader(); }
+    }
+    return r;
+  } catch(e) { return null; }
 }
 
 function pedirCamera(c){
@@ -488,7 +601,37 @@ function esperarVideo(v){
   });
 }
 
+function lacoNativo(det){
+  var v = el('vid');
+  function passo(){
+    if (!scanning) { return; }
+    if (pausado) { laco = setTimeout(passo, 250); return; }
+    try {
+      det.detect(v).then(function(r){ if (r && r.length && scanning && !pausado) { aceitar(r[0].rawValue); } }).catch(function(){});
+    } catch(e) {}
+    laco = setTimeout(passo, 120);
+  }
+  passo();
+}
+
 function lacoLeitura(){
+  if ('BarcodeDetector' in window) {
+    Promise.resolve()
+     .then(function(){ return window.BarcodeDetector.getSupportedFormats ? window.BarcodeDetector.getSupportedFormats() : null; })
+     .then(function(sup){
+       var quero = ['qr_code', 'code_128'], lista = [];
+       if (sup && sup.length) { for (var i = 0; i < quero.length; i++) { if (sup.indexOf(quero[i]) >= 0) { lista.push(quero[i]); } } }
+       var det = null;
+       try { det = lista.length ? new window.BarcodeDetector({ formats: lista }) : null; } catch(e) { det = null; }
+       if (det) { lacoNativo(det); } else { lacoZXing(); }
+     })
+     .catch(function(){ lacoZXing(); });
+    return;
+  }
+  lacoZXing();
+}
+
+function lacoZXing(){
   var v = el('vid');
   var cv = document.createElement('canvas');
   var ctx = null;
@@ -513,13 +656,13 @@ function lacoLeitura(){
         } catch(e2) { /* nao achou nada neste quadro: normal */ }
       }
     } catch(e) { /* quadro ruim: tenta o proximo */ }
-    laco = setTimeout(passo, 220);
+    laco = setTimeout(passo, 120);
   }
   passo();
 }
 
 var TENTATIVAS = [
-  ['camera de tras', { video: { facingMode: { ideal: 'environment' } }, audio: false }],
+  ['camera de tras', { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }],
   ['camera de tras (simples)', { video: { facingMode: 'environment' } }],
   ['camera padrao', { video: true, audio: false }],
   ['camera minima', { video: {} }]
@@ -671,7 +814,7 @@ function restaurar(){
          var ls = String(l.local || '').split(',');
          var lim = [];
          for (var i=0;i<ls.length;i++){ var x = String(ls[i]).trim(); if (x) { lim.push(x); } }
-         return { codigo:l.codigo, nome:l.nome, idBling:l.idBling, deposito:String(l.deposito), contado:Number(l.contado), fisico:Number(l.fisico_no_ato), reserva:Number(l.reserva_no_ato), locais:lim };
+         return { codigo:l.codigo, nome:l.nome, idBling:l.idBling, deposito:String(l.deposito), contado:Number(l.contado), fisico:Number(l.fisico_no_ato), reserva:Number(l.reserva_no_ato), locais:lim, origem:String(l.origem || 'bipagem'), nota:String(l.observacao || '') };
        });
        desenhar(); desenharColunas();
        msg('sessao ' + SESSAO + ' carregada');
@@ -817,15 +960,16 @@ el('procura').addEventListener('click', function(e){
     var a = achados[i];
     if (a.fisico === null) { msg('nao li o saldo dessa variacao, nao vou contar as cegas', true); return; }
     if (precisaLocal() && !LOCAL) { msg('escolha a coluna antes de contar (lista acima ou QR)', true); return; }
-    somar(a, q);
+    var org = origemDoProcurar();
+    somar(a, q, org, (org === 'procurar_apos_falha' && ultimaFalhaCod) ? ('entrou pelo Procurar depois da etiqueta ' + ultimaFalhaCod + ' falhar') : 'entrou pelo Procurar sem tentativa de leitura');
     if (campo) { campo.value = ''; }
-    msg('somei ' + q + ' em ' + a.codigo);
+    msg('somei ' + q + ' em ' + a.codigo + ' (' + (org === 'procurar_apos_falha' ? 'etiqueta divergente' : 'sem etiqueta') + ')');
   }
 });
 
 el('btexport').addEventListener('click', function(){
-  var linhas = ['codigo;nome;deposito;local;contado;bling;reserva'];
-  for (var i=0;i<itens.length;i++){ var it=itens[i]; linhas.push([it.codigo,String(it.nome||'').replace(/;/g,','),it.deposito,(it.locais||[]).join(' '),it.contado,it.fisico,it.reserva].join(';')); }
+  var linhas = ['codigo;nome;deposito;local;contado;bling;reserva;origem;observacao'];
+  for (var i=0;i<itens.length;i++){ var it=itens[i]; linhas.push([it.codigo,String(it.nome||'').replace(/;/g,','),it.deposito,(it.locais||[]).join(' '),it.contado,it.fisico,it.reserva,(it.origem||'bipagem'),String(it.nota||'').replace(/;/g,',')].join(';')); }
   var p = el('painel');
   p.style.display='block';
   p.innerHTML = '<h3>CSV da sessao ' + esc(SESSAO) + '</h3><div class=obs style=margin-bottom:6px>selecione tudo e copie</div><textarea rows=12>' + esc(linhas.join('\n')) + '</textarea>';
