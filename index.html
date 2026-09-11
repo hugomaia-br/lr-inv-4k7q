@@ -159,7 +159,12 @@ var CHAVE = params.get('chave') || '';
 var BASE = 'https://hugomaia.app.n8n.cloud/webhook';
 var API = BASE + '/lr-inventario';
 var GRAVAR = BASE + '/lr-inventario-gravar';
-var SESSAO = params.get('sessao') || ('inv-' + new Date().toISOString().slice(0,10));
+// A data que nomeia a sessao e a de Sao Paulo (UTC-3), nao a de Londres.
+// Sem isso a sessao virava sozinha as 21h e partia a contagem em duas:
+// a tela esvaziava no meio do trabalho e a gravacao so pegava metade.
+// O Brasil nao tem mais horario de verao, entao -3h fixo esta correto.
+function diaDeSaoPaulo(){ return new Date(Date.now() - 3 * 3600000).toISOString().slice(0,10); }
+var SESSAO = params.get('sessao') || ('inv-' + diaDeSaoPaulo());
 var dep = params.get('deposito') || '14888813825';
 var COM_LOCAL = { '14888813825':1, '14889165652':1 };
 var MAPA_COL = [['A','D',13],['A','E',11],['B','D',1],['B','E',5],['C','D',11],['C','E',13]];
